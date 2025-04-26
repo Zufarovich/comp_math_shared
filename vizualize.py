@@ -23,9 +23,7 @@ def read_matrix_from_file(filename):
             matrix.append(row)
     return matrix
 
-
-filename = "results.txt" 
-matrix = read_matrix_from_file(filename)
+matrix = read_matrix_from_file("results.txt")
     
 
 plt.figure()
