@@ -14,7 +14,7 @@ typedef struct{
     double h;
 } Params;
 
-
+// sosat!!!!
 int N_x = 1000;
 int M_tau = 10000;
 
