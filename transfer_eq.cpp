@@ -15,7 +15,7 @@ typedef struct{
 } Params;
 
 int N_x = 1000;
-int M_tau = 10000;
+int M_tau = 1000;
 
 
 void four_points_next_layer(std::vector<double>& previous, std::vector<double>& next, Params params);

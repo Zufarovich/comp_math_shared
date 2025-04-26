@@ -3,10 +3,6 @@ import matplotlib.pyplot as plt
 import math as m
 
 
-
-
-
-
 def read_matrix_from_file(filename):
     """
     Считывает матрицу double-ов из файла.
@@ -27,9 +23,8 @@ def read_matrix_from_file(filename):
             matrix.append(row)
     return matrix
 
-# Пример использования
 
-filename = "results.txt"  # Замените на имя вашего файла
+filename = "results.txt" 
 matrix = read_matrix_from_file(filename)
     
 
