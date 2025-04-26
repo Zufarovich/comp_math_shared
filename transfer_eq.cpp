@@ -24,6 +24,11 @@ double phi_func(int n);
 
 
 int main(int argc, char* argv[]){
+    if (argc == 1){
+        printf("You have to eneter coeficient a too!\n");
+        return 0;
+    }
+
     double a = atof(argv[1]);
 
     double phi[N_x];
@@ -31,7 +36,7 @@ int main(int argc, char* argv[]){
     double h = 1 / ((double) N_x);
     std::vector<std::vector<double> > f(M_tau, std::vector<double>(N_x));
 
-    if(a * tau / h > 1){
+    if (a * tau / h > 1){
         printf("The Courant Number %g > 1!\n", a * tau / h);
         abort();
     }
