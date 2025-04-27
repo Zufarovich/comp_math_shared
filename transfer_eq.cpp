@@ -77,15 +77,14 @@ int main(int argc, char* argv[]){
 }
 
 
-
 void four_points_next_layer(std::vector<double>& previous, std::vector<double>& next, Params params) {
     double coef = params.tau * params.a / (2.0 * params.h);
 
     for (int i = 1; i < N_x - 1; i++) {
-        next[i] = previous[i] - coef * (previous[i + 1] - previous[i - 1]);
+        next[i] = previous[i] - coef * (previous[i + 1] - previous[i - 1]) + params.tau * (*params.f)[0][i];
     }
 
-    next[N_x - 1] = previous[N_x - 1] - 2 * coef * (previous[N_x - 1] - previous[N_x - 2]);
+    next[N_x - 1] = previous[N_x - 1] - 2 * coef * (previous[N_x - 1] - previous[N_x - 2]) + params.tau * (*params.f)[0][N_x - 1];
 }
 
 void cross_next_layer(std::vector<std::vector<double> >& grid, int num_t_layer, Params params){
@@ -97,7 +96,7 @@ void cross_next_layer(std::vector<std::vector<double> >& grid, int num_t_layer, 
     }
 
     grid[num_t_layer][N_x - 1] = grid[num_t_layer - 1][N_x-1] - coef *
-    (grid[num_t_layer - 1][N_x-1] - grid[num_t_layer - 1][N_x-2]);
+    (grid[num_t_layer - 1][N_x-1] - grid[num_t_layer - 1][N_x-2]) + params.tau * (*params.f)[num_t_layer - 1][N_x - 1];
 }
 
 double phi_func(int n){

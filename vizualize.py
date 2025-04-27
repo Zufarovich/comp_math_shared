@@ -35,5 +35,6 @@ matrix = read_matrix_from_file(filename)
 
 plt.figure()
 x = np.linspace(0, 1, 1000)
-plt.plot(x, matrix[100])
+for t in range (0, 1000, 100):
+    plt.plot(x, matrix[t])
 plt.show()
