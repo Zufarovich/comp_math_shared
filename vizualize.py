@@ -37,4 +37,4 @@ plt.figure()
 x = np.linspace(0, 1, 1000)
 for t in range (0, 1000, 100):
     plt.plot(x, matrix[t])
-plt.show()
+plt.savefig("test.png")

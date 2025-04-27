@@ -40,6 +40,9 @@ int main(int argc, char* argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &commsize);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
+    double t_start = MPI_Wtime();
+
+
     int last = commsize - 1;
     int remainder = Num_x_points % commsize;
     int product = Num_x_points / commsize;
@@ -156,6 +159,11 @@ int main(int argc, char* argv[])
         }
         fprintf(save, "\n");
     }
+
+    double t_end = MPI_Wtime();
+
+    double elapsed = t_end - t_start;
+    printf("Elapsed time = %f seconds\n", elapsed);
 
 
     MPI_Finalize();

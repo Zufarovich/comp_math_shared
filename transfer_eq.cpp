@@ -4,6 +4,8 @@
 #include <math.h>
 #include <vector>
 #include <cstdlib>
+#include <chrono>
+#include <iostream>
 
 #define _USE_MATH_DEFINES
 
@@ -28,6 +30,9 @@ int main(int argc, char* argv[]){
         printf("You have to eneter coeficient a too!\n");
         return 0;
     }
+
+    // Начало замера
+    auto start = std::chrono::high_resolution_clock::now();
 
     double a = atof(argv[1]);
 
@@ -59,6 +64,12 @@ int main(int argc, char* argv[]){
     for(int j = 2; j < M_tau; j++){
         cross_next_layer(grid_solution, j, pampam);
     }
+
+    // Конец замера и вывод затраченного времени
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "Elapsed time: " << elapsed.count() << " seconds\n";
 
     FILE* save = fopen("results.txt", "w");
     if (save == nullptr) {
