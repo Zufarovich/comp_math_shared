@@ -16,7 +16,7 @@ typedef struct{
     double h;
 } Params;
 
-int Num_x_points = 1000;
+int Num_x_points = 30000;
 int N_x = Num_x_points;
 int M_tau = 10000;
 
