@@ -339,7 +339,7 @@ int main(int argc, char* argv[]) {
         std::lock_guard<std::mutex> lock(sdat.list_mutex);
         PUT_TO_GLOBAL_STACK_LOCKED(A, B, fA, fB, sAB);
     } // Возвращаем мьютекс
-    sdat.task_available_cv.notify_one(); // Будим один поток
+    //sdat.task_available_cv.notify_one(); // Будим один поток
     // Как только его стек достигнет определенного значения,
     // а это произойдет, если задача достаточно большая, то он позовет
     // на помощь остальные потоки
