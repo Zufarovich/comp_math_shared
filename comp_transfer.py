@@ -58,7 +58,8 @@ def implicit_scheme_b_vectorized_precomp(c_func, f_func, u_initial, u_left_bc, u
         print(f"Implicit B Warning: Very small denominator {denom:.2e}.")
         u[1:, :] = np.nan; return u, x_grid, t_grid
     for j in range(Nt - 1):
-        t_next = t_grid[j+1]; f_next_row = f_func(x_grid, t_next)
+        t_next = t_grid[j+1]
+        f_next_row = f_func(x_grid, t_next)
         u[j + 1, 0] = u_left_bc(t_next)
         for n in range(1, Nx):
             rhs = u[j, n] + tau * f_next_row[n]
@@ -96,39 +97,22 @@ def lax_wendroff_scheme_vectorized(c_func, f_func, u_initial, u_left_bc, u_right
 
 def ftcs_scheme_vectorized(c_func, f_func, u_initial, u_left_bc, u_right_bc,
                             x_min, x_max, t_max, Nx, Nt):
-    """
-    Implements the Explicit Four-Point scheme (Forward Time Centered Space - FTCS).
-    Formula: u_m^{n+1} = u_m^n - c*tau/2h * (u_{m+1}^n - u_{m-1}^n)
-
-    WARNING: This scheme is UNCONDITIONALLY UNSTABLE for the linear
-             advection equation (du/dt + c du/dx = 0) and will likely diverge rapidly.
-             It is included here for illustrative purposes based on the request.
-    """
     h, tau, r_val, x_grid, t_grid, u, c_val = init_grid_and_params(u_initial, x_min, x_max, t_max, Nx, Nt, c_func)
 
-    # --- !!! CRITICAL WARNING !!! ---
-    print("\nFTCS Scheme Warning: This scheme is UNCONDITIONALLY UNSTABLE for the pure advection equation.")
-    print("Expect divergence (NaNs or large numbers) very quickly.")
-    # Although theoretically unstable, sometimes for very small tau it might run for a short time.
 
     for j in range(Nt - 1):
         # Apply boundary conditions for the next time step
         u[j + 1, 0] = u_left_bc(t_grid[j + 1])
-        u[j + 1, -1] = u_right_bc(t_grid[j + 1]) # Using analytical/given BC
-
-        # Calculate interior points using the FTCS formula
+        u[j + 1, -1] = u_right_bc(t_grid[j + 1]) 
+        
         # u_m^{n+1} = u_m^n - (r/2) * (u_{m+1}^n - u_{m-1}^n)
-        # Note: f_func is ignored here as the simple FTCS doesn't naturally include it
-        # without modification, and the source term is zero anyway.
-        u_jp1_interior = u[j, 1:-1] - 0.5 * r_val * (u[j, 2:] - u[j, :-2])
-                          # + tau * f_func(x_grid[1:-1], t_grid[j]) # Add if source term needed
+        
+        u_jp1_interior = u[j, 1:-1] - 0.5 * r_val * (u[j, 2:] - u[j, :-2]) + tau * f_func(x_grid[1:-1], t_grid[j]) # Add if source term needed
 
         u[j + 1, 1:-1] = u_jp1_interior
 
-        # --- Check for immediate divergence ---
         if not np.all(np.isfinite(u[j+1, 1:-1])):
              print(f"FTCS Divergence detected at step j={j}, t={t_grid[j+1]:.4f}")
-             # Set remaining steps to NaN to prevent further computation/warnings
              u[j+2:, :] = np.nan
              break # Stop the time loop
 
@@ -140,25 +124,20 @@ def ftcs_scheme_vectorized(c_func, f_func, u_initial, u_left_bc, u_right_bc,
 def linear_regr(log_h, a, b):
     return a * log_h + b
 
-# --- UPDATED Convergence Analysis ---
 def calculate_convergence(scheme_func, analytical_sol, c_func, f_func,
                          u_initial, u_left_bc, u_right_bc,
                          x_min, x_max, t_max, N_steps=7, Nx_base=41, # Increased N_steps slightly
                          r_stable=0.2, c_const=C_VAL): # <<< Reduced r_stable
-    """Calculates and plots convergence order, fixing Courant number, fitting all points."""
     if not hasattr(scheme_func, 'name'):
-        # Set a readable name if not present
         scheme_func.name = scheme_func.__name__.replace("_", " ").title()
 
     print(f"\n--- Convergence Analysis for {scheme_func.name} (Target r={r_stable}) ---")
     errors_max = [] # Max norm (L-infinity)
-    errors_l2 = []  # L2 norm
     h_values = []
 
     Nx_values = np.unique(np.geomspace(Nx_base, Nx_base * 2**(N_steps-1), N_steps, dtype=int))
     print(f"Testing Nx values: {Nx_values}")
 
-    if not callable(analytical_sol): print("Analytical solution function not provided."); return None
     if abs(c_const) < 1e-14: print("Convergence test requires non-zero velocity."); return None
 
     f_test = f_func
@@ -192,22 +171,15 @@ def calculate_convergence(scheme_func, analytical_sol, c_func, f_func,
             if solution_num is None or len(t_grid) != Nt_test: print(f"Sim failed/incomplete Nx={Nx_test}. Skip."); continue
             if np.any(np.isnan(solution_num[-1, :])): print(f"NaN detected Nx={Nx_test}. Skip."); continue
 
-            t_final = t_grid[-1]
-            solution_an = analytical_sol(x_grid, t_final, c=c_const)
-            error_vec = solution_num[-1, :] - solution_an
-
-            max_error = np.max(np.abs(error_vec))
-            l2_error = np.sqrt(h * np.sum(error_vec**2)) # L2 norm calculation
+            u_analytical = np.array([analytical_sol(x_grid, t, c=c_const) for t in t_grid])
+            max_error = np.max(np.abs(solution_num - u_analytical))
 
             # Check errors before logging
             valid_max = np.isfinite(max_error) and max_error > 1e-15 # Need positive error for log
-            valid_l2 = np.isfinite(l2_error) and l2_error > 1e-15   # Need positive error for log
 
             if not valid_max or max_error > 1e4: print(f"Invalid max_err ({max_error:.2e}) Nx={Nx_test}. Skip."); continue
-            if not valid_l2 or l2_error > 1e4: print(f"Invalid l2_err ({l2_error:.2e}) Nx={Nx_test}. Skip."); continue
 
             errors_max.append(max_error)
-            errors_l2.append(l2_error)
             h_values.append(h)
 
         except OverflowError: print(f"Overflow Nx={Nx_test}. Skip."); continue
@@ -216,70 +188,60 @@ def calculate_convergence(scheme_func, analytical_sol, c_func, f_func,
     warnings.filterwarnings('default', 'invalid value encountered in log')
     warnings.filterwarnings('default', 'divide by zero encountered in log')
 
-    # --- Curve Fitting and Plotting (Using all valid points) ---
+    # --- Curve Fitting and Plotting for Max Norm (Linf) Only ---
     results = {}
-    for norm_name, errors in [("Max Norm (Linf)", errors_max), ("L2 Norm", errors_l2)]:
-        print(f"\n-- Fitting for {norm_name} --")
-        if len(errors) < 3:
-            print(f"Not enough valid points ({len(errors)} < 3) for {norm_name}.")
-            results[norm_name] = None
-            continue
+    norm_name = "Max Norm (Linf)"
+    errors = errors_max
+    print(f"\n-- Fitting for {norm_name} --")
+    if len(errors) < 3:
+        print(f"Not enough valid points ({len(errors)} < 3) for {norm_name}.")
+        results[norm_name] = None
+        return results.get("Max Norm (Linf)")
 
-        log_h = np.log(np.array(h_values))
-        log_error = np.log(np.array(errors))
+    log_h = np.log(np.array(h_values))
+    log_error = np.log(np.array(errors))
 
-        valid_indices = np.isfinite(log_h) & np.isfinite(log_error)
-        log_h_valid = log_h[valid_indices]
-        log_error_valid = log_error[valid_indices]
+    valid_indices = np.isfinite(log_h) & np.isfinite(log_error)
+    log_h_valid = log_h[valid_indices]
+    log_error_valid = log_error[valid_indices]
 
-        if len(log_h_valid) < 3:
-            print(f"Not enough valid points ({len(log_h_valid)} < 3) after log/filter for {norm_name}.")
-            results[norm_name] = None
-            continue
+    if len(log_h_valid) < 3:
+        print(f"Not enough valid points ({len(log_h_valid)} < 3) after log/filter for {norm_name}.")
+        results[norm_name] = None
+        return results.get("Max Norm (Linf)")
 
-        try:
-            # *** Fit using ALL valid points ***
-            popt, pcov = curve_fit(linear_regr, log_h_valid, log_error_valid)
-            convergence_order = popt[0]
-            perr = np.sqrt(np.diag(pcov))
-            slope_std_err = perr[0]
+    try:
+        popt, pcov = curve_fit(linear_regr, log_h_valid, log_error_valid)
+        convergence_order = popt[0]
+        perr = np.sqrt(np.diag(pcov))
+        slope_std_err = perr[0]
 
-            print(f"Estimated Order ({norm_name}): {convergence_order:.3f} +/- {slope_std_err:.3f}")
-            results[norm_name] = convergence_order # Store result
+        print(f"Estimated Order ({norm_name}): {convergence_order:.3f} +/- {slope_std_err:.3f}")
+        results[norm_name] = convergence_order # Store result
 
-            plt.figure(figsize=(10, 6))
-            plt.scatter(log_h_valid, log_error_valid, marker='o', label=f'log({norm_name}) vs log(h)')
+        plt.figure(figsize=(10, 6))
+        plt.scatter(log_h_valid, log_error_valid, marker='o', label=f'log({norm_name}) vs log(h)')
 
-            # *** Plot fit line over the full range of valid data ***
-            x_plot_fit = np.linspace(min(log_h_valid), max(log_h_valid), 100)
-            plt.plot(x_plot_fit, linear_regr(x_plot_fit, popt[0], popt[1]), color='red', linestyle='--',
-                     label=f'Linear Fit (Slope={convergence_order:.3f}) on all {len(log_h_valid)} points')
+        x_plot_fit = np.linspace(min(log_h_valid), max(log_h_valid), 100)
+        plt.plot(x_plot_fit, linear_regr(x_plot_fit, popt[0], popt[1]), color='red', linestyle='--',
+                 label=f'Linear Fit (Slope={convergence_order:.3f}) on all {len(log_h_valid)} points')
 
-            # Add reference lines
-            theo_order_guess = 1 if any(s in scheme_func.name for s in ['Upwind', 'Implicit', 'Friedrichs']) else (2 if 'Wendroff' in scheme_func.name else 0)
-            if abs(round(convergence_order) - theo_order_guess) < 0.6 : # Plot reference if close
-                 plt.plot(x_plot_fit, linear_regr(x_plot_fit, theo_order_guess, popt[1]), color='gray', linestyle=':', label=f'Slope = {theo_order_guess} Ref')
-            elif theo_order_guess == 2 and abs(round(convergence_order)-1) < 0.6: # Maybe show slope 1 if LW is behaving like 1st order
-                 plt.plot(x_plot_fit, linear_regr(x_plot_fit, 1, popt[1]), color='gray', linestyle=':', label='Slope = 1 Ref')
+        plt.xlabel("log(h) (Spatial Step Size)")
+        plt.ylabel(f"log(Error) ({norm_name})")
+        plt.title(f"Convergence ({norm_name}) for {scheme_func.name}")
+        plt.grid(True); plt.legend(); plt.show()
 
+    except Exception as e:
+        print(f"Error during curve fitting for {norm_name}: {e}")
+        results[norm_name] = None
+        # Plot data even if fit fails
+        plt.figure(figsize=(10, 6))
+        plt.scatter(log_h_valid, log_error_valid, marker='o', label=f'log({norm_name}) vs log(h)')
+        plt.xlabel("log(h)"); plt.ylabel(f"log(Error) ({norm_name})")
+        plt.title(f"Convergence Data ({norm_name}) for {scheme_func.name} (Fit Failed)")
+        plt.grid(True); plt.legend(); plt.show()
 
-            plt.xlabel("log(h) (Spatial Step Size)")
-            plt.ylabel(f"log(Error) ({norm_name})")
-            plt.title(f"Convergence ({norm_name}) for {scheme_func.name}")
-            plt.grid(True); plt.legend(); plt.show()
-
-        except Exception as e:
-            print(f"Error during curve fitting for {norm_name}: {e}")
-            results[norm_name] = None
-            # Plot data even if fit fails
-            plt.figure(figsize=(10, 6))
-            plt.scatter(log_h_valid, log_error_valid, marker='o', label=f'log({norm_name}) vs log(h)')
-            plt.xlabel("log(h)"); plt.ylabel(f"log(Error) ({norm_name})")
-            plt.title(f"Convergence Data ({norm_name}) for {scheme_func.name} (Fit Failed)")
-            plt.grid(True); plt.legend(); plt.show()
-
-    # Return the order obtained from the L2 norm if available, otherwise Max norm
-    return results.get("L2 Norm", results.get("Max Norm (Linf)"))
+    return results.get("Max Norm (Linf)")
 
 
 # --- Main Execution --- (Adjust r_stable for the main call)
@@ -334,13 +296,11 @@ def plot_solution_and_heatmap(name, u_num, x_g, t_g, nt_run):
 
 
 if __name__ == "__main__":
-    # ... (предыдущие настройки Nx, Nt_base, h_sim, target_r_explicit, etc.) ...
     Nx = 101
     Nt_base = 101
     h_sim = (X_BORDER - X_MIN) / (Nx - 1)
     print(f"Base Simulation settings: Nx={Nx}, h={h_sim:.4f}")
     target_r_explicit = 0.2 # Используем малое r
-    # ... (расчет Nt_explicit, r_sim_explicit как раньше) ...
     if abs(C_VAL) > 1e-12:
         tau_explicit_target = target_r_explicit * h_sim / abs(C_VAL); Nt_explicit = int(np.ceil(T_BORDER / tau_explicit_target)) + 1
         if Nt_explicit < 2: Nt_explicit = 2
@@ -363,7 +323,7 @@ if __name__ == "__main__":
     results = {}
     # --- Цикл запуска симуляций и построения графиков ---
     for name, (func, nt_run) in schemes_to_run.items():
-        print(f"\nRun {name} Nx={Nx}, Nt={nt_run}...");
+        print(f"\nRun {name} Nx={Nx}, Nt={nt_run}...")
         try:
             results[name] = func(velocity, source_term, initial_condition, left_boundary_condition, right_boundary_condition, X_MIN, X_BORDER, T_BORDER, Nx, nt_run)
         except Exception as e:
@@ -392,7 +352,7 @@ if __name__ == "__main__":
     for name, order in convergence_results.items():
         if order is not None:
             theo_order = 1 if any(s in name for s in ['Upwind', 'Implicit', 'Friedrichs']) else (2 if 'Wendroff' in name else -1)
-            print(f"{name}: Estimated Order (from L2/MaxInt) = {order:.3f} (Theoretical: ~{theo_order})")
+            print(f"{name}: Estimated Order (from MaxInt) = {order:.3f} (Theoretical: ~{theo_order})")
         elif "FTCS" in name:
              print(f"{name}: Convergence analysis skipped (unstable scheme).")
         else:
