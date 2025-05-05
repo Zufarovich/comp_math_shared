@@ -7,21 +7,24 @@
 #include <unistd.h>      
 #include <stdexcept>     
 #include <iomanip>       
-#include <atomic>        
+#include <atomic>   
+#include <time.h>
 
-const double INTEGRATION_EPSILON = 1e-7; //Задаем точность вычисления
+const double INTEGRATION_EPSILON = 1e-5; //Задаем точность вычисления
 const int LOCAL_STACK_THRESHOLD = 10;    //Максимальное число заданий локальном стэке
 const int MAX_GLOBAL_TASKS = 10000;      //Максимальное число заданий в глобальном стэке
 
 double fun(double x) {
-    if (x == 0.0) {
+    if (x == 10.0) {
         // Возврацает NAN в точках, где функция не определена
         return NAN; 
     }
     // return 1.0 / x;
     //double sin2 = sin(1.0 / x);
      //return 1/(x*x)*sin2*sin2;
-     return 4.0 / (1.0 + x * x);
+    double cos_s = cos(1 / (10 - x));
+     return cos_s;
+    //return 4.0 / (1.0 + x * x);
 }
 
 // Break Condition - условие достижения требуемой точности 
@@ -297,8 +300,11 @@ void worker_thread_func() {
 
 // Основная функция
 int main(int argc, char* argv[]) {
-    double A = 1e-5;
-    double B = 1.0; // Заданная функция  4/(1+x*x) на этом участке дает число пи
+    double total_time = 0.0;
+    struct timespec start, end;
+
+    double A = 0;
+    double B = 9.99; // Заданная функция  4/(1+x*x) на этом участке дает число пи
     int p = 0;
 
     if (argc < 2) {
@@ -324,6 +330,8 @@ int main(int argc, char* argv[]) {
     sdat.nproc = p;
     sdat.maxtask = MAX_GLOBAL_TASKS; 
     sdat.list_of_tasks.resize(sdat.maxtask); 
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     // Проверяем начальные значения функции
     double fA = fun(A);
@@ -372,6 +380,13 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "All threads finished." << std::endl;
 
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    double elapsed_time = (end.tv_sec - start.tv_sec) + 
+                            (end.tv_nsec - start.tv_nsec) / 1e9;
+
+    std::cout << "Elapsed time:" << elapsed_time << std::endl;
+        
     // Выводим результат
     std::cout << std::fixed << std::setprecision(15);
     std::cout << "Integration Result (s_all): " << sdat.s_all << std::endl;
